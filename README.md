@@ -8,12 +8,19 @@ Title + topic + script → story analysis → movie plan → Google Veo scene ge
 
 ```bash
 cp .env.example .env
-docker compose up -d
 npx prisma migrate dev --name init
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:4000](http://localhost:4000).
+
+## VPS deploy (Jenkins + Docker)
+
+Same pattern as auto-reader: Jenkins runs on the VPS, builds the image, then `docker compose up` on that host. Port **4000** (do not use 3000 — auto-reader already binds it).
+
+1. Copy `storymotion.env.example` to a Jenkins Secret file (`storymotion-env-file`) or keep `USE_REPO_ENV_EXAMPLE=true`.
+2. Set `NEXT_PUBLIC_APP_URL=http://187.127.138.86:4000` (or your domain).
+3. Run the Jenkins pipeline. Stages: Checkout → Detect Tools → Prepare Env → Clean → Docker Build → Smoke Test → Deploy → Post-Deploy Check.
 
 `MOCK_VIDEO_GENERATION=true` is the default. The full pipeline runs with generated placeholder clips so you can test the studio without Google credits.
 
@@ -44,7 +51,7 @@ A 30-second film is **multiple clips concatenated with FFmpeg**. Veo does not em
 
 ## Architecture
 
-See `docs/architecture.md` and `docs/video-generation-pipeline.md`.
+See `docs/architecture.md`, `docs/video-generation-pipeline.md`, and `docs/deploy.md`.
 
 Jobs are Postgres-backed. `instrumentation.ts` starts an in-process worker. For production, run:
 

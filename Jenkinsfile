@@ -5,122 +5,339 @@ pipeline {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '20'))
+    timeout(time: 60, unit: 'MINUTES')
   }
 
   parameters {
-    string(name: 'IMAGE_NAME', defaultValue: 'storymotion-ai', description: 'Docker image name')
-    string(name: 'APP_PORT', defaultValue: '4000', description: 'Host port mapped to the container')
-    string(name: 'APP_URL', defaultValue: 'http://YOUR_VPS_IP:4000', description: 'Public URL baked into NEXT_PUBLIC_APP_URL')
-    string(name: 'APP_NAME', defaultValue: 'StoryMotion AI', description: 'Public app name')
-    string(name: 'VPS_HOST', defaultValue: '', description: 'VPS hostname or IP')
-    string(name: 'VPS_USER', defaultValue: 'deploy', description: 'SSH user on the VPS')
-    string(name: 'VPS_APP_DIR', defaultValue: '/opt/storymotion', description: 'App directory on the VPS')
-    string(name: 'SSH_CREDENTIALS_ID', defaultValue: 'vps-ssh', description: 'Jenkins SSH username-with-private-key credential ID')
-    booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run unit tests before building the image')
-    booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Deploy the image to the VPS after a successful build')
+    choice(
+      name: 'DEPLOY_ENV',
+      choices: ['staging', 'production'],
+      description: 'Target environment for deploy'
+    )
+    booleanParam(
+      name: 'SKIP_DEPLOY',
+      defaultValue: false,
+      description: 'Build and test only — skip deploy stage'
+    )
+    booleanParam(
+      name: 'FORCE_RECREATE',
+      defaultValue: false,
+      description: 'Force recreate containers on deploy'
+    )
+    string(
+      name: 'PUBLIC_APP_URL',
+      defaultValue: 'http://187.127.138.86:4000',
+      description: 'Browser-facing app URL baked into the web image'
+    )
+    string(
+      name: 'ENV_CREDENTIAL_ID',
+      defaultValue: 'storymotion-env-file',
+      description: 'Jenkins Secret file credential ID (only used when USE_ENV_CREDENTIAL=true)'
+    )
+    booleanParam(
+      name: 'USE_ENV_CREDENTIAL',
+      defaultValue: false,
+      description: 'OFF by default. Turn ON only after you create the Jenkins Secret file credential.'
+    )
+    booleanParam(
+      name: 'USE_REPO_ENV_EXAMPLE',
+      defaultValue: true,
+      description: 'Use storymotion.env.example from the repo when no credential is loaded'
+    )
   }
 
   environment {
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
-    COMPOSE_FILE = 'docker-compose.prod.yml'
+    APP_NAME             = 'storymotion'
+    APP_IMAGE            = "storymotion-ai:${env.BUILD_NUMBER}"
+    APP_IMAGE_LATEST     = 'storymotion-ai:latest'
+    COMPOSE_PROJECT_NAME = 'storymotion'
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
-      }
-    }
-
-    stage('Test') {
-      when {
-        expression { return params.RUN_TESTS }
-      }
-      steps {
         sh '''
-          set -eu
-          docker build --target test -t ${IMAGE_NAME}:test-${IMAGE_TAG} .
+          echo "Branch: ${GIT_BRANCH:-unknown}"
+          echo "Commit: ${GIT_COMMIT:-unknown}"
+          git rev-parse --short HEAD || true
+          echo "=== Workspace files ==="
+          ls -la
+          test -f docker-compose.yml || { echo "ERROR: docker-compose.yml missing"; exit 1; }
+          test -f Dockerfile || { echo "ERROR: Dockerfile missing"; exit 1; }
+          test -f package.json || { echo "ERROR: package.json missing"; exit 1; }
+          test -f scripts/jenkins_smoke.js || { echo "ERROR: jenkins_smoke.js missing"; exit 1; }
         '''
       }
     }
 
-    stage('Build image') {
+    stage('Detect Tools') {
       steps {
         sh '''
-          set -eu
-          docker build \
-            --build-arg NEXT_PUBLIC_APP_NAME="${APP_NAME}" \
-            --build-arg NEXT_PUBLIC_APP_URL="${APP_URL}" \
-            -t ${IMAGE_NAME}:${IMAGE_TAG} \
-            -t ${IMAGE_NAME}:latest \
-            .
+          echo "=== Agent tools ==="
+          docker --version
+          docker compose version
+          echo "WORKSPACE=${WORKSPACE}"
+          echo "PWD=$(pwd)"
         '''
       }
     }
 
-    stage('Deploy to VPS') {
-      when {
-        expression { return params.DEPLOY }
-      }
+    stage('Prepare Env') {
       steps {
         script {
-          if (!params.VPS_HOST?.trim()) {
-            error('Set VPS_HOST (and SSH credentials) before deploying.')
-          }
-        }
-        sshagent(credentials: [params.SSH_CREDENTIALS_ID]) {
-          sh '''
-            set -eu
-            ssh -o StrictHostKeyChecking=accept-new ${VPS_USER}@${VPS_HOST} "mkdir -p ${VPS_APP_DIR}"
-            scp -o StrictHostKeyChecking=accept-new ${COMPOSE_FILE} ${VPS_USER}@${VPS_HOST}:${VPS_APP_DIR}/${COMPOSE_FILE}
+          def usedEnv = false
+          def credId = (params.ENV_CREDENTIAL_ID ?: 'storymotion-env-file').trim()
 
-            ssh -o StrictHostKeyChecking=accept-new ${VPS_USER}@${VPS_HOST} "
-              set -eu
-              cd ${VPS_APP_DIR}
-              if [ ! -f .env ]; then
-                cat > .env <<EOF
+          if (params.USE_ENV_CREDENTIAL) {
+            withCredentials([file(credentialsId: credId, variable: 'ENV_FILE')]) {
+              sh '''
+                echo "Secret file path bound: $ENV_FILE"
+                test -f "$ENV_FILE" || { echo "ERROR: credential file path missing"; exit 1; }
+                cp -f "$ENV_FILE" .env.deploy
+                echo "Copied credential file → .env.deploy"
+              '''
+              usedEnv = true
+              echo "Loaded Jenkins credential ID: ${credId}"
+            }
+          } else {
+            echo "USE_ENV_CREDENTIAL=false — skipping Jenkins secret lookup (this is OK)."
+          }
+
+          if (!usedEnv) {
+            sh '''
+              echo "=== Looking for env files ==="
+              ls -la storymotion.env.example storymotion.env .env \
+                /var/jenkins_home/storymotion.env /var/jenkins_home/secrets/storymotion.env 2>/dev/null || true
+            '''
+            def candidates = []
+            if (params.USE_REPO_ENV_EXAMPLE) {
+              candidates.add('storymotion.env.example')
+            }
+            candidates.addAll([
+              'storymotion.env',
+              '.env',
+              '/var/jenkins_home/secrets/storymotion.env',
+              '/var/jenkins_home/storymotion.env',
+            ])
+            for (p in candidates) {
+              if (fileExists(p)) {
+                sh "cp -f '${p}' .env.deploy"
+                usedEnv = true
+                echo "Using env file: ${p} → .env.deploy"
+                break
+              }
+            }
+          }
+
+          if (!usedEnv) {
+            sh '''
+              cat > .env.deploy <<'EOF'
+APP_HOST_PORT=4000
 GOOGLE_AI_API_KEY=
 GEMINI_API_KEY=
 GOOGLE_TEXT_MODEL=gemini-3.6-flash
 ENABLE_VIDEO_GENERATION=false
 MOCK_VIDEO_GENERATION=false
 JOB_RUNNER=inline
-STORAGE_DRIVER=local
-STORAGE_PATH=/app/storage
 DATABASE_URL=file:/data/prod.db
-NEXT_PUBLIC_APP_NAME=${APP_NAME}
-NEXT_PUBLIC_APP_URL=${APP_URL}
+STORAGE_PATH=/app/storage
+NEXT_PUBLIC_APP_NAME=StoryMotion AI
+NEXT_PUBLIC_APP_URL=http://187.127.138.86:4000
 EOF
-                echo 'Created ${VPS_APP_DIR}/.env — add GOOGLE_AI_API_KEY on the VPS before the first request.'
+            '''
+            usedEnv = true
+            echo "Wrote built-in default .env.deploy with VPS IP 187.127.138.86"
+          }
+
+          if (params.PUBLIC_APP_URL?.trim()) {
+            def url = params.PUBLIC_APP_URL.trim()
+            sh """
+              if grep -q '^NEXT_PUBLIC_APP_URL=' .env.deploy; then
+                sed -i.bak 's|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=${url}|' .env.deploy
+              else
+                echo 'NEXT_PUBLIC_APP_URL=${url}' >> .env.deploy
               fi
-            "
+              echo "PUBLIC_APP_URL applied: ${url}"
+            """
+          }
 
-            echo "Copying image ${IMAGE_NAME}:${IMAGE_TAG} to ${VPS_HOST}..."
-            docker save ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest | gzip | ssh -o StrictHostKeyChecking=accept-new ${VPS_USER}@${VPS_HOST} "gunzip | docker load"
-
-            ssh -o StrictHostKeyChecking=accept-new ${VPS_USER}@${VPS_HOST} "
-              set -eu
-              cd ${VPS_APP_DIR}
-              export STORYMOTION_IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
-              export APP_PORT=${APP_PORT}
-              export NEXT_PUBLIC_APP_URL=${APP_URL}
-              export NEXT_PUBLIC_APP_NAME='${APP_NAME}'
-              docker compose -f ${COMPOSE_FILE} up -d --remove-orphans
-              docker image prune -f
-              docker compose -f ${COMPOSE_FILE} ps
-            "
+          sh '''
+            echo "=== .env.deploy key check (values hidden) ==="
+            missing=0
+            for key in NEXT_PUBLIC_APP_URL; do
+              val=$(grep -E "^${key}=" .env.deploy | head -n1 | cut -d= -f2- || true)
+              if [ -n "$val" ]; then
+                echo "$key=SET"
+              else
+                echo "$key=MISSING"
+                missing=1
+              fi
+            done
+            app_url=$(grep -E "^NEXT_PUBLIC_APP_URL=" .env.deploy | head -n1 | cut -d= -f2- || true)
+            echo "NEXT_PUBLIC_APP_URL value: ${app_url}"
+            case "$app_url" in
+              *YOUR_VPS_IP*|*your_vps_ip*|*YOUR_DOMAIN*|*your_domain*)
+                echo "ERROR: NEXT_PUBLIC_APP_URL still contains a placeholder hostname."
+                echo "Set PUBLIC_APP_URL=http://187.127.138.86:4000 and rebuild."
+                exit 1
+                ;;
+            esac
+            if [ "$missing" = "1" ] && [ "${SKIP_DEPLOY}" != "true" ]; then
+              echo "ERROR: env file is missing required keys (NEXT_PUBLIC_APP_URL)."
+              exit 1
+            fi
           '''
+            echo "Prepared .env.deploy for ${params.DEPLOY_ENV}"
         }
+      }
+    }
+
+    stage('Clean') {
+      steps {
+        sh '''
+          set +e
+          echo "=== Clean previous StoryMotion containers/images (keep sqlite/storage volumes) ==="
+          docker compose -f docker-compose.yml down --remove-orphans || true
+          docker rm -f storymotion-app 2>/dev/null || true
+          docker rmi -f storymotion-ai:latest 2>/dev/null || true
+          docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '/^storymotion-ai:/{print $2}' | sort -u | xargs -r docker rmi -f
+          echo "=== Remaining storymotion images ==="
+          docker images | grep storymotion || echo "(none)"
+        '''
+      }
+    }
+
+    stage('Docker Build') {
+      steps {
+        sh '''
+          set -e
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env.deploy
+          set +a
+
+          echo "Building StoryMotion image (NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL})..."
+          docker build \
+            --build-arg "NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}" \
+            --build-arg "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" \
+            -t ${APP_IMAGE} -t ${APP_IMAGE_LATEST} \
+            .
+
+          docker images | grep storymotion | head -n 20 || docker images | head -n 12
+        '''
+      }
+    }
+
+    stage('Smoke Test') {
+      steps {
+        sh '''
+          set -e
+          docker run --rm \
+            --entrypoint node \
+            -e DATABASE_URL=file:./smoke.db \
+            -e ENABLE_VIDEO_GENERATION=false \
+            ${APP_IMAGE} \
+            scripts/jenkins_smoke.js
+        '''
+      }
+    }
+
+    stage('Deploy') {
+      when {
+        expression { return !params.SKIP_DEPLOY }
+      }
+      steps {
+        sh '''
+          set -e
+          export IMAGE_TAG=${BUILD_NUMBER}
+          export APP_HOST_PORT=${APP_HOST_PORT:-4000}
+          cp -f .env.deploy .env
+
+          set -a
+          # shellcheck disable=SC1091
+          . ./.env
+          set +a
+
+          echo "Runtime check: NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL} GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:+SET}"
+
+          echo "Freeing previous StoryMotion containers (if any)..."
+          docker compose -f docker-compose.yml down --remove-orphans || true
+          docker rm -f storymotion-app 2>/dev/null || true
+
+          free_port() {
+            PORT="$1"
+            CID="$(docker ps --format '{{.ID}} {{.Ports}}' | awk -v p=":${PORT}->" 'index($0,p){print $1; exit}')"
+            if [ -n "$CID" ]; then
+              echo "Port ${PORT} is used by container ${CID} — stopping it"
+              docker stop "$CID" || true
+              docker rm "$CID" || true
+            fi
+          }
+          free_port "${APP_HOST_PORT}"
+
+          echo "Starting stack from the images just built (no compose rebuild)..."
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate
+
+          echo "Waiting for app healthy (via docker exec — works with Jenkins-in-Docker)..."
+          for i in $(seq 1 45); do
+            if docker exec storymotion-app wget -qO- http://127.0.0.1:4000 >/tmp/storymotion_health.html 2>/dev/null; then
+              echo "App healthy"
+              docker compose -f docker-compose.yml ps
+              exit 0
+            fi
+            STATUS="$(docker inspect -f '{{.State.Health.Status}}' storymotion-app 2>/dev/null || echo unknown)"
+            echo "attempt ${i}: health=${STATUS}"
+            if [ "$STATUS" = "healthy" ]; then
+              docker exec storymotion-app wget -qO- http://127.0.0.1:4000 >/dev/null || true
+              echo
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "App health check failed"
+          docker compose -f docker-compose.yml ps || true
+          docker compose -f docker-compose.yml logs --tail=120
+          exit 1
+        '''
+      }
+    }
+
+    stage('Post-Deploy Check') {
+      when {
+        expression { return !params.SKIP_DEPLOY }
+      }
+      steps {
+        sh '''
+          set -e
+          echo "=== Container status ==="
+          docker compose -f docker-compose.yml ps || true
+          echo "=== App responds ==="
+          docker exec storymotion-app wget -qO- http://127.0.0.1:4000 >/tmp/storymotion_web.html 2>/dev/null \
+            || docker exec storymotion-app wget -qO- http://127.0.0.1:4000/ >/tmp/storymotion_web.html 2>/dev/null \
+            || true
+          if [ -s /tmp/storymotion_web.html ]; then
+            echo "web_ok bytes=$(wc -c </tmp/storymotion_web.html)"
+          else
+            echo "WARN: could not fetch HTML from inside container (image may still be starting)"
+            docker logs storymotion-app --tail=40 || true
+          fi
+        '''
       }
     }
   }
 
   post {
     success {
-      echo "Build ${IMAGE_TAG} succeeded. App should be at ${params.APP_URL}"
+      echo "StoryMotion ${params.DEPLOY_ENV} build #${env.BUILD_NUMBER} succeeded"
+      echo "UI: http://187.127.138.86:4000"
     }
     failure {
-      echo 'Build or deploy failed. Check the stage logs above.'
+      echo "StoryMotion build #${env.BUILD_NUMBER} failed — check stage logs"
+      sh 'docker compose -f docker-compose.yml logs --tail=120 || true'
+    }
+    always {
+      sh 'rm -f .env.deploy.bak || true'
     }
   }
 }

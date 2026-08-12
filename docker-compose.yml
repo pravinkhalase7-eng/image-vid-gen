@@ -1,19 +1,51 @@
+# Production / VPS docker-compose for StoryMotion AI
+# Used by Jenkinsfile (same pattern as auto-reader / AI Teacher).
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: storymotion
-      POSTGRES_PASSWORD: storymotion
-      POSTGRES_DB: storymotion
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:4000}
+    image: storymotion-ai:${IMAGE_TAG:-latest}
+    container_name: storymotion-app
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${APP_HOST_PORT:-4000}:4000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "4000"
+      DATABASE_URL: ${DATABASE_URL:-file:/data/prod.db}
+      STORAGE_PATH: /app/storage
+      ENABLE_VIDEO_GENERATION: ${ENABLE_VIDEO_GENERATION:-false}
+      MOCK_VIDEO_GENERATION: ${MOCK_VIDEO_GENERATION:-false}
+      JOB_RUNNER: inline
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_TEXT_MODEL: ${GOOGLE_TEXT_MODEL:-gemini-3.6-flash}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:4000}
     volumes:
-      - storymotion_pg:/var/lib/postgresql/data
+      - storymotion_data:/data
+      - storymotion_storage:/app/storage
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U storymotion"]
-      interval: 5s
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000"]
+      interval: 20s
       timeout: 5s
-      retries: 10
+      retries: 8
+      start_period: 40s
+    networks:
+      - storymotion
 
 volumes:
-  storymotion_pg:
+  storymotion_data:
+  storymotion_storage:
+
+networks:
+  storymotion:
+    name: storymotion_net

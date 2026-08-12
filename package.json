@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "worker": "tsx scripts/worker.ts",
-    "db:up": "docker compose up -d",
+    "db:up": "echo 'Local DB is SQLite (prisma/dev.db). VPS: docker compose up -d'",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate"
