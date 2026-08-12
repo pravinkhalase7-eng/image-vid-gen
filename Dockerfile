@@ -8,6 +8,7 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+ENV DATABASE_URL="file:./prisma/build.db"
 RUN npm ci
 
 FROM node:22-bookworm-slim AS builder
