@@ -67,6 +67,7 @@ pipeline {
           test -f Dockerfile || { echo "ERROR: Dockerfile missing"; exit 1; }
           test -f package.json || { echo "ERROR: package.json missing"; exit 1; }
           test -f scripts/jenkins_smoke.js || { echo "ERROR: jenkins_smoke.js missing"; exit 1; }
+          test -f scripts/export_env.sh || { echo "ERROR: export_env.sh missing"; exit 1; }
         '''
       }
     }
@@ -142,7 +143,7 @@ MOCK_VIDEO_GENERATION=false
 JOB_RUNNER=inline
 DATABASE_URL=file:/data/prod.db
 STORAGE_PATH=/app/storage
-NEXT_PUBLIC_APP_NAME=StoryMotion AI
+NEXT_PUBLIC_APP_NAME="StoryMotion AI"
 NEXT_PUBLIC_APP_URL=http://187.127.138.86:4000
 EOF
             '''
@@ -212,10 +213,9 @@ EOF
       steps {
         sh '''
           set -e
-          set -a
           # shellcheck disable=SC1091
-          . ./.env.deploy
-          set +a
+          . ./scripts/export_env.sh
+          load_env ./.env.deploy
 
           echo "Building StoryMotion image (NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL})..."
           docker build \
@@ -254,10 +254,9 @@ EOF
           export APP_HOST_PORT=${APP_HOST_PORT:-4000}
           cp -f .env.deploy .env
 
-          set -a
           # shellcheck disable=SC1091
-          . ./.env
-          set +a
+          . ./scripts/export_env.sh
+          load_env ./.env
 
           echo "Runtime check: NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL} GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:+SET}"
 
