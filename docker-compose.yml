@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: storymotion
+      POSTGRES_PASSWORD: storymotion
+      POSTGRES_DB: storymotion
+    ports:
+      - "5432:5432"
+    volumes:
+      - storymotion_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storymotion"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  storymotion_pg:

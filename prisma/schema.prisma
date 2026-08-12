@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ProjectStatus {
+  DRAFT
+  ANALYZING
+  PLANNING
+  READY_TO_GENERATE
+  GENERATING
+  ASSEMBLING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SceneStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobType {
+  ANALYZE
+  GENERATE
+  REGENERATE_SCENE
+  ASSEMBLE
+  RETRY
+}
+
+enum AssetKind {
+  SCENE_VIDEO
+  FINAL_VIDEO
+  THUMBNAIL
+  CHARACTER_REF
+  WORLD_REF
+}
+
+model User {
+  id        String         @id @default(cuid())
+  email     String?        @unique
+  name      String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  projects  VideoProject[]
+
+  @@map("users")
+}
+
+model VideoProject {
+  id              String        @id @default(cuid())
+  userId          String?       @map("user_id")
+  user            User?         @relation(fields: [userId], references: [id])
+  title           String
+  topic           String
+  script          String
+  language        String        @default("auto")
+  status          ProjectStatus @default(DRAFT)
+  duration        Int           @default(30)
+  actualDuration  Float?        @map("actual_duration")
+  aspectRatio     String        @default("16:9") @map("aspect_ratio")
+  resolution      String        @default("720p")
+  style           String        @default("cinematic_3d")
+  voice           String        @default("child_friendly")
+  enableNarration Boolean       @default(true) @map("enable_narration")
+  enableMusic     Boolean       @default(true) @map("enable_music")
+  styleBible      String?       @map("style_bible")
+  estimatedScenes Int?          @map("estimated_scenes")
+  thumbnailPath   String?       @map("thumbnail_path")
+  finalVideoPath  String?       @map("final_video_path")
+  errorMessage    String?       @map("error_message")
+  safetyResult    Json?         @map("safety_result")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  story       Story?
+  characters  Character[]
+  world       World?
+  scenes      Scene[]
+  jobs        GenerationJob[]
+  assets      VideoAsset[]
+  audioAssets AudioAsset[]
+  settings    VideoSettings?
+
+  @@index([status, createdAt])
+  @@map("video_projects")
+}
+
+model VideoSettings {
+  id              String       @id @default(cuid())
+  projectId       String       @unique @map("project_id")
+  project         VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aspectRatio     String       @default("16:9") @map("aspect_ratio")
+  resolution      String       @default("720p")
+  duration        Int          @default(30)
+  voice           String       @default("child_friendly")
+  language        String       @default("auto")
+  style           String       @default("cinematic_3d")
+  enableNarration Boolean      @default(true) @map("enable_narration")
+  enableMusic     Boolean      @default(true) @map("enable_music")
+
+  @@map("video_settings")
+}
+
+model Story {
+  id           String       @id @default(cuid())
+  projectId    String       @unique @map("project_id")
+  project      VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  summary      String
+  storyArc     Json         @map("story_arc")
+  events       Json
+  emotions     Json
+  objects      Json
+  locations    Json
+  analysisJson Json         @map("analysis_json")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@map("stories")
+}
+
+model Character {
+  id                 String       @id @default(cuid())
+  projectId          String       @map("project_id")
+  project            VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slug               String
+  name               String
+  species            String
+  age                String
+  appearance         String
+  clothing           String
+  personality        String
+  visualFeatures     Json         @map("visual_features")
+  referenceImagePath String?      @map("reference_image_path")
+  createdAt          DateTime     @default(now()) @map("created_at")
+
+  @@unique([projectId, slug])
+  @@map("characters")
+}
+
+model World {
+  id                 String       @id @default(cuid())
+  projectId          String       @unique @map("project_id")
+  project            VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment        String
+  colorPalette       Json         @map("color_palette")
+  lighting           String
+  timeOfDay          String       @map("time_of_day")
+  architecture       String
+  backgroundElements Json         @map("background_elements")
+  bible              String
+  createdAt          DateTime     @default(now()) @map("created_at")
+
+  @@map("worlds")
+}
+
+model Scene {
+  id            String      @id @default(cuid())
+  projectId     String      @map("project_id")
+  project       VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneKey      String      @map("scene_key")
+  orderIndex    Int         @map("order_index")
+  duration      Int
+  title         String
+  scriptSegment String      @map("script_segment")
+  narration     String
+  characterSlugs Json       @map("character_slugs")
+  location      String
+  timeOfDay     String      @map("time_of_day")
+  emotion       String
+  visualPrompt  String      @map("visual_prompt")
+  camera        String
+  transition    String
+  shotType      String      @map("shot_type")
+  status        SceneStatus @default(PENDING)
+  videoPath     String?     @map("video_path")
+  thumbnailPath String?     @map("thumbnail_path")
+  startOffset   Float?      @map("start_offset")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  generations   SceneGeneration[]
+
+  @@unique([projectId, sceneKey])
+  @@index([projectId, orderIndex])
+  @@map("scenes")
+}
+
+model SceneGeneration {
+  id             String      @id @default(cuid())
+  sceneId        String      @map("scene_id")
+  scene          Scene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  attemptCount   Int         @default(0) @map("attempt_count")
+  lastError      String?     @map("last_error")
+  providerStatus String?     @map("provider_status")
+  providerJobId  String?     @map("provider_job_id")
+  prompt         String
+  status         SceneStatus @default(PENDING)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  attempts       GenerationAttempt[]
+
+  @@map("scene_generations")
+}
+
+model GenerationJob {
+  id          String       @id @default(cuid())
+  projectId   String       @map("project_id")
+  project     VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        JobType
+  status      JobStatus    @default(QUEUED)
+  stage       String?
+  progress    Int          @default(0)
+  message     String?
+  sceneId     String?      @map("scene_id")
+  provider    String?
+  model       String?
+  error       String?
+  heartbeatAt DateTime?    @map("heartbeat_at")
+  startedAt   DateTime?    @map("started_at")
+  completedAt DateTime?    @map("completed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  attempts    GenerationAttempt[]
+
+  @@index([status, createdAt])
+  @@index([projectId, type])
+  @@map("generation_jobs")
+}
+
+model GenerationAttempt {
+  id                String           @id @default(cuid())
+  jobId             String?          @map("job_id")
+  job               GenerationJob?   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sceneGenerationId String?          @map("scene_generation_id")
+  sceneGeneration   SceneGeneration? @relation(fields: [sceneGenerationId], references: [id], onDelete: Cascade)
+  attempt           Int
+  status            String
+  provider          String?
+  model             String?
+  error             String?
+  durationMs        Int?             @map("duration_ms")
+  startedAt         DateTime         @default(now()) @map("started_at")
+  completedAt       DateTime?        @map("completed_at")
+
+  @@map("generation_attempts")
+}
+
+model VideoAsset {
+  id        String       @id @default(cuid())
+  projectId String       @map("project_id")
+  project   VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      AssetKind
+  path      String
+  mimeType  String       @map("mime_type")
+  duration  Float?
+  sceneId   String?      @map("scene_id")
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([projectId, kind])
+  @@map("video_assets")
+}
+
+model AudioAsset {
+  id        String       @id @default(cuid())
+  projectId String       @map("project_id")
+  project   VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      String
+  path      String
+  mimeType  String       @map("mime_type")
+  duration  Float?
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([projectId, kind])
+  @@map("audio_assets")
+}

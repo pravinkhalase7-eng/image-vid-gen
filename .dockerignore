@@ -1,0 +1,20 @@
+# dependencies
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.cursor
+.vscode
+.next
+coverage
+storage
+prisma/dev.db
+prisma/dev.db-journal
+.env
+.env.*
+!.env.example
+README.md
+docs
+agent-transcripts
+**/*.md
+!AGENTS.md

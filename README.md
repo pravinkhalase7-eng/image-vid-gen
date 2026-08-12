@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StoryMotion AI
 
-## Getting Started
+Turn a kids' story into a cinematic animated movie.
 
-First, run the development server:
+Title + topic + script → story analysis → movie plan → Google Veo scene generation → FFmpeg assembly → player.
+
+## Quick start (mock mode, no API credits)
 
 ```bash
+cp .env.example .env
+docker compose up -d
+npx prisma migrate dev --name init
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`MOCK_VIDEO_GENERATION=true` is the default. The full pipeline runs with generated placeholder clips so you can test the studio without Google credits.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Live Google generation
 
-## Learn More
+1. Create a Gemini API key.
+2. Set in `.env`:
 
-To learn more about Next.js, take a look at the following resources:
+```
+MOCK_VIDEO_GENERATION=false
+GOOGLE_AI_API_KEY=...
+GOOGLE_VIDEO_MODEL=veo-3.1-fast-generate-preview
+GOOGLE_TEXT_MODEL=gemini-3.6-flash
+GOOGLE_TTS_MODEL=gemini-3.1-flash-tts-preview
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Restart `npm run dev`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Verified APIs (do not invent methods):
 
-## Deploy on Vercel
+- Text: `models.generateContent` with JSON mime type
+- Video: `models.generateVideos` → `operations.get` → `files.download` (Veo 3.1, **4/6/8 second clips**)
+- Speech: `models.generateContent` with `responseModalities: ['AUDIO']`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A 30-second film is **multiple clips concatenated with FFmpeg**. Veo does not emit a 30s clip in one call.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Casting note:** Veo blocks photorealistic children. Prompts require stylized animal/fantasy characters.
+
+## Architecture
+
+See `docs/architecture.md` and `docs/video-generation-pipeline.md`.
+
+Jobs are Postgres-backed. `instrumentation.ts` starts an in-process worker. For production, run:
+
+```bash
+npm run worker
+```
+
+with `JOB_RUNNER=worker`.
+
+## Tests
+
+```bash
+npm test
+```

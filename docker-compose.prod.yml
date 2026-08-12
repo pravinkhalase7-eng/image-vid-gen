@@ -1,0 +1,42 @@
+services:
+  app:
+    image: ${STORYMOTION_IMAGE:-storymotion-ai:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:4000}
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-4000}:4000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "4000"
+      DATABASE_URL: file:/data/prod.db
+      STORAGE_PATH: /app/storage
+      ENABLE_VIDEO_GENERATION: "false"
+      MOCK_VIDEO_GENERATION: "false"
+      JOB_RUNNER: inline
+    volumes:
+      - storymotion-data:/data
+      - storymotion-storage:/app/storage
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  storymotion-data:
+  storymotion-storage:
