@@ -217,11 +217,13 @@ EOF
           . ./scripts/export_env.sh
           load_env ./.env.deploy
 
-          echo "Building StoryMotion image (NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL})..."
+          APP_NAME="${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}"
+          APP_URL="${NEXT_PUBLIC_APP_URL}"
+          echo "Building StoryMotion image (NEXT_PUBLIC_APP_URL=${APP_URL})..."
           docker build \
-            --build-arg "NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-StoryMotion AI}" \
-            --build-arg "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" \
-            -t ${APP_IMAGE} -t ${APP_IMAGE_LATEST} \
+            --build-arg NEXT_PUBLIC_APP_NAME="${APP_NAME}" \
+            --build-arg NEXT_PUBLIC_APP_URL="${APP_URL}" \
+            -t "${APP_IMAGE}" -t "${APP_IMAGE_LATEST}" \
             .
 
           docker images | grep storymotion | head -n 20 || docker images | head -n 12
