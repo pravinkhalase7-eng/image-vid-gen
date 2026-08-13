@@ -77,65 +77,114 @@ pipeline {
     stage('Prepare Env') {
       steps {
         script {
-          def usedEnv = false
+          sh 'cp -f storymotion.env.example .env.deploy'
+          echo "Started from storymotion.env.example"
+
+          def loadedSecret = false
+          def tried = []
           def credIds = []
-          def paramId = (params.ENV_CREDENTIAL_ID ?: 'storymotion-env-file').trim()
+          def paramId = (params.ENV_CREDENTIAL_ID ?: 'storymotion-env-file').toString().trim()
           credIds.add(paramId)
-          ['storymotion-env-file', 'storymotion-env-file.env'].each { id ->
-            if (!credIds.contains(id)) {
-              credIds.add(id)
+          ['storymotion-env-file', 'storymotion-env-file.env', 'image-vid-gen-env-file', 'image-vid-gen'].each { extra ->
+            if (!credIds.contains(extra)) {
+              credIds.add(extra)
             }
           }
 
-          for (id in credIds) {
-            if (usedEnv) {
+          for (int i = 0; i < credIds.size(); i++) {
+            def credId = credIds.get(i).toString()
+            tried.add(credId)
+            if (loadedSecret) {
               break
             }
             try {
-              withCredentials([file(credentialsId: id, variable: 'ENV_FILE')]) {
+              withCredentials([file(credentialsId: credId, variable: 'ENV_FILE')]) {
                 sh '''
                   echo "Secret file path bound: $ENV_FILE"
                   test -f "$ENV_FILE" || { echo "ERROR: credential file path missing"; exit 1; }
                   cp -f "$ENV_FILE" .env.deploy
-                  echo "Copied Jenkins secret file → .env.deploy"
+                  echo "Copied Secret file → .env.deploy"
                 '''
-                usedEnv = true
               }
-              echo "Loaded Jenkins credential ID: ${id}"
+              loadedSecret = true
+              echo "Loaded Secret file credential ID: ${credId}"
             } catch (err) {
-              echo "Could not load credential ${id}: ${err}"
+              echo "No Secret file with ID '${credId}' (${err})"
             }
           }
 
-          if (!usedEnv) {
-            sh '''
-              echo "=== Looking for fallback env files (not leftover workspace .env) ==="
-              ls -la /var/jenkins_home/secrets/storymotion.env /var/jenkins_home/storymotion.env storymotion.env 2>/dev/null || true
-            '''
-            def candidates = [
-              '/var/jenkins_home/secrets/storymotion.env',
-              '/var/jenkins_home/storymotion.env',
-              'storymotion.env',
-            ]
-            for (p in candidates) {
+          if (!loadedSecret) {
+            def textIds = []
+            textIds.add(paramId)
+            ['GOOGLE_AI_API_KEY', 'GEMINI_API_KEY', 'google-ai-api-key', 'storymotion-env-file'].each { extra ->
+              if (!textIds.contains(extra)) {
+                textIds.add(extra)
+              }
+            }
+            for (int j = 0; j < textIds.size(); j++) {
+              def credId = textIds.get(j).toString()
+              if (!tried.contains(credId)) {
+                tried.add("string:${credId}")
+              }
+              if (loadedSecret) {
+                break
+              }
+              try {
+                withCredentials([string(credentialsId: credId, variable: 'GOOGLE_KEY')]) {
+                  sh '''
+                    set -e
+                    key=$(printf '%s' "$GOOGLE_KEY" | tr -d '\r' | tr -d '\n')
+                    test -n "$key" || { echo "ERROR: Secret text was empty"; exit 1; }
+                    awk -v k="$key" '
+                      BEGIN { done=0 }
+                      /^GOOGLE_AI_API_KEY=/ { print "GOOGLE_AI_API_KEY=" k; done=1; next }
+                      { print }
+                      END { if (!done) print "GOOGLE_AI_API_KEY=" k }
+                    ' .env.deploy > .env.deploy.tmp
+                    mv .env.deploy.tmp .env.deploy
+                    echo "Wrote GOOGLE_AI_API_KEY from Secret text (value hidden)"
+                  '''
+                }
+                loadedSecret = true
+                echo "Loaded Secret text credential ID: ${credId}"
+              } catch (err) {
+                echo "No Secret text with ID '${credId}' (${err})"
+              }
+            }
+          }
+
+          def candidates = [
+            '/var/jenkins_home/secrets/storymotion.env',
+            '/var/jenkins_home/storymotion.env',
+            'storymotion.env',
+          ]
+          if (!loadedSecret) {
+            for (int k = 0; k < candidates.size(); k++) {
+              def p = candidates.get(k)
               if (fileExists(p)) {
                 sh "cp -f '${p}' .env.deploy"
-                usedEnv = true
+                loadedSecret = true
                 echo "Using env file: ${p} → .env.deploy"
                 break
               }
             }
           }
 
-          if (!usedEnv) {
-            error('''No env source found.
-Create Jenkins credential:
-  Kind: Secret file
-  ID: storymotion-env-file
-  Scope: Global
-  File contents: copy of storymotion.env.example with GOOGLE_AI_API_KEY filled in
-The credential ID is the ID field in Jenkins — not the uploaded filename (storymotion-env-file.env).
-Then rebuild.''')
+          if (!loadedSecret) {
+            error("""Jenkins has no credential this job can read.
+
+Tried IDs: ${tried.join(', ')}
+
+Fix (do this once, then rebuild):
+1. Manage Jenkins → Credentials → (global) → your uploaded file
+2. Click it → set ID to exactly: storymotion-env-file
+   The ID is NOT the filename storymotion-env-file.env
+   If ID is a long UUID, that is the problem — change it.
+3. Kind must be Secret file (or Secret text with the API key only)
+4. Scope: Global, and this job must be allowed to use it
+5. File must contain: GOOGLE_AI_API_KEY=your_gemini_key
+
+Or: Build with Parameters → ENV_CREDENTIAL_ID = the ID shown on that credential page.""")
           }
 
           if (params.PUBLIC_APP_URL?.trim()) {
