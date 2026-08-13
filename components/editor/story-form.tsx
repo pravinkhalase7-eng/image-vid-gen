@@ -27,6 +27,7 @@ export function StoryForm() {
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [resolution, setResolution] = useState("720p");
   const [duration, setDuration] = useState(0);
+  const [sceneCount, setSceneCount] = useState(0);
   const [voice, setVoice] = useState("child_friendly");
   const [language, setLanguage] = useState("auto");
   const [style, setStyle] = useState("cinematic_3d");
@@ -37,10 +38,10 @@ export function StoryForm() {
     const words = countWords(script);
     const seconds = estimateNarrationSeconds(script);
     const plan = script.trim()
-      ? planClipDurations({ script, targetSeconds: duration })
+      ? planClipDurations({ script, targetSeconds: duration, sceneCount })
       : { sceneCount: 0, total: duration };
     return { words, chars: script.length, seconds, scenes: plan.sceneCount, total: plan.total };
-  }, [script, duration]);
+  }, [script, duration, sceneCount]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +58,7 @@ export function StoryForm() {
           aspectRatio,
           resolution,
           duration,
+          sceneCount,
           voice,
           language,
           style,
@@ -77,7 +79,7 @@ export function StoryForm() {
     <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
       <Card>
         <h2 className="font-display text-3xl">Create a Video</h2>
-        <p className="mt-2 text-sm text-muted">Paste a story. Label Scene 1, Scene 2, Scene 3 to keep that many clips. Each prompt includes lip-sync for that scene&apos;s line.</p>
+        <p className="mt-2 text-sm text-muted">Paste a story. Label Scene 1, Scene 2, Scene 3 — we keep exactly that many screens, not extra shots.</p>
 
         <div className="mt-8 space-y-5">
           <div>
@@ -110,6 +112,7 @@ export function StoryForm() {
                   setTitle("The Little Elephant Who Was Afraid of Water");
                   setTopic("An elephant learning to overcome fear");
                   setScript(SAMPLE);
+                  setSceneCount(3);
                 }}
               >
                 Try a sample story
@@ -140,7 +143,7 @@ export function StoryForm() {
         </Button>
         {stats.scenes > 0 && (
           <p className="mt-3 text-center text-xs text-muted">
-            Estimated generation: {stats.scenes} scenes · about {formatDuration(stats.total)}
+            This will create exactly {stats.scenes} scene{stats.scenes === 1 ? "" : "s"} · about {formatDuration(stats.total)}
           </p>
         )}
       </Card>
@@ -171,6 +174,17 @@ export function StoryForm() {
                 <option value="30">Max 30 sec</option>
                 <option value="60">Max 60 sec</option>
                 <option value="90">Max 90 sec</option>
+              </Select>
+            </div>
+            <div>
+              <Label>Scenes</Label>
+              <Select value={String(sceneCount)} onChange={(e) => setSceneCount(Number(e.target.value))}>
+                <option value="0">Auto from script</option>
+                <option value="2">Exactly 2</option>
+                <option value="3">Exactly 3</option>
+                <option value="4">Exactly 4</option>
+                <option value="5">Exactly 5</option>
+                <option value="6">Exactly 6</option>
               </Select>
             </div>
             <div>

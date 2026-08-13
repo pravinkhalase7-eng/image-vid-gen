@@ -26,7 +26,13 @@ export class MockTextProvider implements TextProvider {
     throw new Error(`MockTextProvider cannot handle ${options.schemaName} directly`);
   }
 
-  analyze(input: { title: string; topic: string; script: string; targetSeconds: number }) {
+  analyze(input: {
+    title: string;
+    topic: string;
+    script: string;
+    targetSeconds: number;
+    sceneCount?: number;
+  }) {
     const safety: SafetyVerdict = {
       safe: !UNSAFE.test(input.script),
       categories: [],
@@ -60,7 +66,11 @@ export class MockTextProvider implements TextProvider {
       background_elements: ["tall grass", "fireflies", "distant mountains", "sparkling water"],
       bible: `A cohesive family-friendly world for "${input.title}". Palette stays warm gold, soft teal, and cream. Lighting is gentle and readable. ${locations.join(", ") || "storybook meadows"} remain geographically consistent.`,
     };
-    const plan = planClipDurations({ script: input.script, targetSeconds: input.targetSeconds });
+    const plan = planClipDurations({
+      script: input.script,
+      targetSeconds: input.targetSeconds,
+      sceneCount: input.sceneCount,
+    });
     const scenes = buildScenes(plan.bodies, characters, locations, plan.durations);
     return {
       safety,

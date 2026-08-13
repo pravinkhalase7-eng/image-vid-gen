@@ -41,7 +41,11 @@ export async function POST(request: Request) {
     const story = validateStoryInput(body);
     await classifyStory(story);
 
-    const clips = planClipDurations({ script: story.script, targetSeconds: body.duration });
+    const clips = planClipDurations({
+      script: story.script,
+      targetSeconds: body.duration,
+      sceneCount: body.sceneCount,
+    });
 
     const project = await prisma.videoProject.create({
       data: {

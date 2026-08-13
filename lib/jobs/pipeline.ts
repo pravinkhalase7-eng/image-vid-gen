@@ -92,7 +92,11 @@ async function runAnalyze(jobId: string, projectId: string) {
   });
   await jobQueue.heartbeat(jobId, { stage: "story", progress: 20, message: "Understanding your story..." });
 
-  const clipPlan = planClipDurations({ script: project.script, targetSeconds: project.duration });
+  const clipPlan = planClipDurations({
+    script: project.script,
+    targetSeconds: 0,
+    sceneCount: project.estimatedScenes ?? 0,
+  });
   const text = getTextProvider();
 
   let story: StoryAnalysis;
@@ -107,6 +111,7 @@ async function runAnalyze(jobId: string, projectId: string) {
       topic: project.topic,
       script: project.script,
       targetSeconds: clipPlan.total,
+      sceneCount: clipPlan.sceneCount,
     });
     story = bundle.story;
     characters = bundle.characters;
@@ -160,6 +165,19 @@ async function runAnalyze(jobId: string, projectId: string) {
       spoken_line: scene.spoken_line || scene.narration,
     }));
   }
+
+  scenes = clipPlan.bodies.map((body, i) => {
+    const scene = scenes[i] || scenes[scenes.length - 1];
+    return {
+      ...scene,
+      scene_id: `scene_${String(i + 1).padStart(2, "0")}`,
+      order: i + 1,
+      duration: clipPlan.durations[i] ?? scene.duration,
+      script_segment: body,
+      narration: scene.spoken_line || scene.narration,
+      spoken_line: scene.spoken_line || scene.narration,
+    };
+  });
 
   await persistPlan(projectId, { story, characters, world, styleBible, scenes });
   const plannedSeconds = scenes.reduce((sum, scene) => sum + scene.duration, 0);

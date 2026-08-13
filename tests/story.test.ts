@@ -17,9 +17,29 @@ describe("story parsing", () => {
     expect(plan.safety.safe).toBe(true);
     expect(plan.characters.some((c) => c.name === "Momo")).toBe(true);
     expect(plan.characters[0].clothing).toContain("scarf");
-    expect(plan.scenes.length).toBeGreaterThanOrEqual(1);
+    expect(plan.scenes.length).toBe(1);
     expect(plan.scenes.reduce((a, s) => a + s.duration, 0)).toBeGreaterThanOrEqual(4);
     expect(plan.scenes.reduce((a, s) => a + s.duration, 0)).toBeLessThan(30);
+  });
+
+  it("keeps a 3-scene script as 3 scenes", () => {
+    const mock = new MockTextProvider();
+    const script = `Scene 1
+Momo stands by the river. He says, "The water looks so big."
+
+Scene 2
+He takes one small step. "The water feels cool."
+
+Scene 3
+Momo trumpets. "I'm not unsure anymore!"`;
+    const plan = mock.analyze({
+      title: "Momo",
+      topic: "courage",
+      script,
+      targetSeconds: 0,
+      sceneCount: 3,
+    });
+    expect(plan.scenes).toHaveLength(3);
   });
 
   it("rejects empty title", () => {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { planClipDurations, estimateNarrationSeconds, snapDuration, splitScriptScenes } from "@/lib/ai/video/duration";
+import {
+  planClipDurations,
+  estimateNarrationSeconds,
+  snapDuration,
+  splitScriptScenes,
+  detectLabeledSceneCount,
+} from "@/lib/ai/video/duration";
 import { extractSpokenLine } from "@/lib/ai/video/dialogue";
 
 const SHORT = "Once upon a time a little star named Luma made a friend.";
@@ -47,6 +53,36 @@ describe("duration planner", () => {
     expect(plan.sceneCount).toBe(3);
     expect(plan.durations).toHaveLength(3);
     expect(plan.bodies).toHaveLength(3);
+  });
+
+  it("does not turn title + body paragraphs into six scenes", () => {
+    const titled = `Scene 1
+Once upon a time, in a beautiful jungle, there lived a little elephant named Momo. Momo loved flowers, fruit, and his friends. He looks at the river and says, "The water looks so big."
+
+Scene 2
+One sunny morning, Momo watched the other animals splash and laugh. He took a tiny step. Then another. "The water feels cool and kind," he says.
+
+Scene 3
+Momo trumpeted with joy. "I'm not unsure anymore!" He was brave, and the jungle cheered with him.`;
+    expect(detectLabeledSceneCount(titled)).toBe(3);
+    expect(splitScriptScenes(titled)).toHaveLength(3);
+    expect(planClipDurations({ script: titled, targetSeconds: 0 }).sceneCount).toBe(3);
+  });
+
+  it("honors an explicit sceneCount even if paragraphs would split more", () => {
+    const sixParas = `The river bank.
+
+Momo looks at the water and says the river looks so big today.
+
+The first step.
+
+He takes one small step into the cool water and smiles.
+
+The trumpet.
+
+Momo trumpets with joy because he is brave now.`;
+    expect(planClipDurations({ script: sixParas, targetSeconds: 0, sceneCount: 3 }).sceneCount).toBe(3);
+    expect(splitScriptScenes(sixParas, 3)).toHaveLength(3);
   });
 
   it("does not turn every sentence into its own scene", () => {
