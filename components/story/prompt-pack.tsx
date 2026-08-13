@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export type PromptPackData = {
   title: string;
@@ -72,18 +73,22 @@ export function PromptPack({ pack }: { pack: PromptPackData }) {
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   async function copy() {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await copyToClipboard(text);
+      setStatus("copied");
+    } catch {
+      setStatus("failed");
+    }
+    window.setTimeout(() => setStatus("idle"), 1600);
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" onClick={copy}>
-      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-      {copied ? "Copied" : label}
+    <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+      {status === "copied" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      {status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : label}
     </Button>
   );
 }
