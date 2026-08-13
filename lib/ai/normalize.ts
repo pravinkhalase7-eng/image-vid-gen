@@ -1,3 +1,4 @@
+import { slugify } from "@/lib/utils";
 import { extractSpokenLine } from "@/lib/ai/video/dialogue";
 import type { CharacterBible, PlannedScene, StoryAnalysis, WorldBible } from "@/lib/ai/types";
 
