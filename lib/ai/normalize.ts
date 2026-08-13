@@ -1,4 +1,4 @@
-import { slugify } from "@/lib/utils";
+import { extractSpokenLine } from "@/lib/ai/video/dialogue";
 import type { CharacterBible, PlannedScene, StoryAnalysis, WorldBible } from "@/lib/ai/types";
 
 export function asString(value: unknown, fallback = ""): string {
@@ -88,16 +88,20 @@ export function normalizeStory(raw: unknown): StoryAnalysis {
 export function normalizeScenes(raw: unknown, durations: number[]): PlannedScene[] {
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const list = Array.isArray(raw) ? raw : Array.isArray(obj.scenes) ? obj.scenes : [];
-  const count = list.length > 0 ? Math.min(list.length, Math.max(1, durations.length)) : durations.length;
+  const count = Math.max(1, durations.length);
   return Array.from({ length: count }, (_, i) => {
     const s = (list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<string, unknown>;
+    const script = asString(pick(s, "script_segment", "scriptSegment"));
+    const spoken = asString(pick(s, "spoken_line", "spokenLine", "dialogue", "line"));
+    const narration = spoken || asString(pick(s, "narration")) || extractSpokenLine(script);
     return {
       scene_id: asString(pick(s, "scene_id", "sceneId"), `scene_${String(i + 1).padStart(2, "0")}`),
-      order: Number(pick(s, "order", "orderIndex")) || i + 1,
+      order: i + 1,
       duration: durations[i] ?? (Number(pick(s, "duration")) || 6),
       title: asString(pick(s, "title"), `Scene ${i + 1}`),
-      script_segment: asString(pick(s, "script_segment", "scriptSegment")),
-      narration: asString(pick(s, "narration")),
+      script_segment: script,
+      narration,
+      spoken_line: narration,
       characters: asStringArray(pick(s, "characters")),
       location: asString(pick(s, "location"), "storybook world"),
       time_of_day: asString(pick(s, "time_of_day", "timeOfDay"), "morning"),

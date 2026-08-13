@@ -50,6 +50,7 @@ export type PlannedScene = {
   title: string;
   script_segment: string;
   narration: string;
+  spoken_line?: string;
   characters: string[];
   location: string;
   time_of_day: string;

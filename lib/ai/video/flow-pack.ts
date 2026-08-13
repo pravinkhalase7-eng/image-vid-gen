@@ -1,5 +1,6 @@
 import { DEFAULT_STYLE_BIBLE } from "@/lib/ai/prompts";
 import type { CharacterBible, PlannedScene, WorldBible } from "@/lib/ai/types";
+import { extractSpokenLine } from "./dialogue";
 import { sanitizeVeoText, VEO_NEGATIVE, VEO_STYLE } from "./sanitize-veo";
 
 export type FlowPromptPack = {
@@ -67,6 +68,10 @@ export function buildSceneFlowPrompt(input: {
     : "Final scene. End on a warm, resolved image and hold the last expression.";
   const action = sanitizeVeoText(input.scene.visual_prompt || input.scene.script_segment);
   const script = sanitizeVeoText(input.scene.script_segment);
+  const spoken = sanitizeVeoText(
+    input.scene.spoken_line || input.scene.narration || extractSpokenLine(input.scene.script_segment),
+  );
+  const speaker = (input.scene.characters || []).filter(Boolean).join(", ") || "the lead character";
 
   return `${input.masterLock}
 
@@ -79,6 +84,17 @@ LOCATION: ${sanitizeVeoText(input.scene.location)}
 CAMERA: ${sanitizeVeoText(input.scene.camera)}
 EMOTION: ${sanitizeVeoText(input.scene.emotion)}
 CONTINUITY: ${prev} ${next}
+
+DIALOGUE (speak these exact words; do not paraphrase or add lines):
+Speaker: ${sanitizeVeoText(speaker)}
+Line: "${spoken}"
+
+LIP SYNC (mandatory):
+- ${sanitizeVeoText(speaker)} speaks that line out loud in this shot.
+- Mouth, lips, jaw, and teeth animate in sync with each syllable of the line (phoneme-accurate visemes).
+- Audio is this line only, clear and natural, starting ~0.3s after the shot begins, finishing before the last 0.4s.
+- No frozen mouth, no mumbling, no mismatched words, no extra ad-lib.
+- Other characters listen with closed or slightly reacting mouths unless they have a line in this scene.
 
 Generate one continuous ${input.scene.duration}-second shot that matches the consistency lock exactly.`;
 }

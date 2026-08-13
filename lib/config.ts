@@ -38,6 +38,7 @@ export const VEO_DURATIONS = [4, 6, 8] as const;
 export const NARRATION_WPM = 140;
 export const MAX_SCENE_RETRIES = 3;
 export const MIN_CLIP_SECONDS = 4;
+export const MAX_SCENE_SECONDS = 16;
 export const MAX_VIDEO_SECONDS = 90;
 export const MAX_SCRIPT_CHARS = 12_000;
 export const MIN_SCRIPT_CHARS = 40;

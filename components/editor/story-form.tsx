@@ -10,7 +10,14 @@ import { countWords, formatDuration } from "@/lib/utils";
 import { estimateNarrationSeconds } from "@/lib/ai/video/duration";
 import { planClipDurations } from "@/lib/ai/video/duration";
 
-const SAMPLE = `Once upon a time, in a beautiful jungle, there lived a little elephant named Momo. Momo loved flowers, fruit, and his friends. But whenever he came near the sparkling river, his knees wobbled. One sunny morning, Momo watched the other animals splash and laugh. He took a tiny step. Then another. The water felt cool and kind. Momo trumpeted with joy. He was not afraid anymore.`;
+const SAMPLE = `Scene 1
+Once upon a time, in a beautiful jungle, there lived a little elephant named Momo. Momo loved flowers, fruit, and his friends. He looks at the river and says, "The water looks so big."
+
+Scene 2
+One sunny morning, Momo watched the other animals splash and laugh. He took a tiny step. Then another. "The water feels cool and kind," he says.
+
+Scene 3
+Momo trumpeted with joy. "I'm not unsure anymore!" He was brave, and the jungle cheered with him.`;
 
 export function StoryForm() {
   const router = useRouter();
@@ -70,7 +77,7 @@ export function StoryForm() {
     <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
       <Card>
         <h2 className="font-display text-3xl">Create a Video</h2>
-        <p className="mt-2 text-sm text-muted">Paste a story. We&apos;ll build a movie plan and copy-ready prompts.</p>
+        <p className="mt-2 text-sm text-muted">Paste a story. Label Scene 1, Scene 2, Scene 3 to keep that many clips. Each prompt includes lip-sync for that scene&apos;s line.</p>
 
         <div className="mt-8 space-y-5">
           <div>
@@ -111,7 +118,7 @@ export function StoryForm() {
             <Textarea
               id="script"
               required
-              placeholder="Once upon a time..."
+              placeholder={"Scene 1\nMomo looks at the river and says, \"I'm a little unsure.\"\n\nScene 2\nHe takes one small step. \"The water feels cool.\"\n\nScene 3\nMomo trumpets. \"I'm not afraid anymore!\""}
               value={script}
               onChange={(e) => setScript(e.target.value)}
             />

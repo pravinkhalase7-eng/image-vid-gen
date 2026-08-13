@@ -147,11 +147,18 @@ async function runAnalyze(jobId: string, projectId: string) {
           targetSeconds: clipPlan.total,
           sceneCount: clipPlan.sceneCount,
           durations: clipPlan.durations,
+          sceneBlocks: clipPlan.bodies,
         }),
         schemaName: "scenes",
       }),
       clipPlan.durations,
     );
+    scenes = scenes.map((scene, i) => ({
+      ...scene,
+      script_segment: scene.script_segment || clipPlan.bodies[i] || "",
+      narration: scene.spoken_line || scene.narration,
+      spoken_line: scene.spoken_line || scene.narration,
+    }));
   }
 
   await persistPlan(projectId, { story, characters, world, styleBible, scenes });

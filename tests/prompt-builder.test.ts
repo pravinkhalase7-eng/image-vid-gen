@@ -108,6 +108,8 @@ describe("Flow prompt pack", () => {
     expect(pack.scenes[0].prompt).toContain(pack.masterLock);
     expect(pack.scenes[1].prompt).toContain(pack.masterLock);
     expect(pack.scenes[1].prompt).toContain("Momo drinks");
+    expect(pack.scenes[0].prompt).toContain("LIP SYNC");
+    expect(pack.scenes[0].prompt).toContain("DIALOGUE");
     expect(pack.all).toContain("Google Flow");
   });
 });

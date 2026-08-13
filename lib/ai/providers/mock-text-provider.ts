@@ -1,6 +1,7 @@
 import { slugify } from "@/lib/utils";
 import { DEFAULT_STYLE_BIBLE } from "@/lib/ai/prompts";
 import { planClipDurations } from "@/lib/ai/video/duration";
+import { extractSpokenLine } from "@/lib/ai/video/dialogue";
 import type {
   CharacterBible,
   PlannedScene,
@@ -60,7 +61,7 @@ export class MockTextProvider implements TextProvider {
       bible: `A cohesive family-friendly world for "${input.title}". Palette stays warm gold, soft teal, and cream. Lighting is gentle and readable. ${locations.join(", ") || "storybook meadows"} remain geographically consistent.`,
     };
     const plan = planClipDurations({ script: input.script, targetSeconds: input.targetSeconds });
-    const scenes = buildScenes(input.script, characters, locations, plan.durations);
+    const scenes = buildScenes(plan.bodies, characters, locations, plan.durations);
     return {
       safety,
       story,
@@ -158,23 +159,23 @@ const CAMERAS = [
 const SHOTS = ["establishing", "character", "close_up", "tracking", "action", "wide", "reaction", "character"];
 
 function buildScenes(
-  script: string,
+  bodies: string[],
   characters: CharacterBible[],
   locations: string[],
-  durations: Array<4 | 6 | 8>,
+  durations: number[],
 ): PlannedScene[] {
-  const sentences = splitSentences(script);
-  const chunks = chunk(sentences.length ? sentences : [script], durations.length);
   const lead = characters[0];
   return durations.map((duration, i) => {
-    const segment = chunks[i]?.join(" ") || sentences[sentences.length - 1] || script;
+    const segment = bodies[i] || bodies[bodies.length - 1] || "";
+    const spoken = extractSpokenLine(segment);
     return {
       scene_id: `scene_${String(i + 1).padStart(2, "0")}`,
       order: i + 1,
       duration,
       title: titleFrom(segment, i),
       script_segment: segment,
-      narration: segment,
+      narration: spoken,
+      spoken_line: spoken,
       characters: [lead.id],
       location: locations[i % locations.length],
       time_of_day: "golden morning",
@@ -190,21 +191,4 @@ function buildScenes(
 function titleFrom(segment: string, i: number) {
   const words = segment.split(/\s+/).slice(0, 6).join(" ");
   return words.length > 8 ? words.replace(/[.,!?].*$/, "") : `Scene ${i + 1}`;
-}
-
-function chunk<T>(items: T[], parts: number) {
-  const out: T[][] = Array.from({ length: parts }, () => []);
-  items.forEach((item, i) => {
-    out[Math.min(parts - 1, Math.floor((i / items.length) * parts))].push(item);
-  });
-  if (out.some((c) => c.length === 0)) {
-    let j = 0;
-    for (const c of out) {
-      if (c.length === 0 && items[j]) {
-        c.push(items[Math.min(j, items.length - 1)]);
-      }
-      j += 1;
-    }
-  }
-  return out;
 }

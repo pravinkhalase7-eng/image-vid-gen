@@ -135,6 +135,7 @@ export function serializePromptPack(project: ProjectBundle) {
     title: s.title,
     script_segment: s.scriptSegment,
     narration: s.narration,
+    spoken_line: s.narration,
     characters: Array.isArray(s.characterSlugs) ? (s.characterSlugs as string[]) : [],
     location: s.location,
     time_of_day: s.timeOfDay,

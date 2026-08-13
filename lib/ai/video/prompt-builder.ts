@@ -57,6 +57,7 @@ Duration: ${input.duration} seconds.
 Title: ${input.scene.title}
 Location: ${input.scene.location}
 What happens (from the script, do not change): ${input.scene.script_segment}
+Spoken line (lip-sync these exact words): ${input.scene.spoken_line || input.scene.narration}
 Visual: ${input.scene.visual_prompt}
 
 NEXT SCENE INTENT:
@@ -70,6 +71,7 @@ ${input.world.lighting}. Soft cinematic lighting, warm, readable faces.
 
 MOTION:
 Smooth, appealing character animation. Natural, unhurried motion matching a ${input.duration}s shot.
+Lip-sync: the speaking character's mouth must match the spoken line syllable by syllable. No silent mouths while dialogue plays.
 
 EMOTION:
 ${input.scene.emotion}. Expressions clear and readable for children.

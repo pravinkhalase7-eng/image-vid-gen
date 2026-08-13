@@ -9,6 +9,7 @@ Create visually engaging cinematic shots.
 Use age-appropriate imagery.
 Keep expressions clear and emotionally readable for children.
 Maintain continuity between scenes.
+On-screen speech must lip-sync: mouth, jaw, and visemes match the spoken_line exactly. No frozen mouths while audio plays. No extra ad-libbed words.
 
 STORY FIDELITY:
 You may add visual transitions, expressions, camera movements, and environmental details that illustrate the current script beat.
