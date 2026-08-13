@@ -12,7 +12,14 @@ export const appConfig = {
   enableCharacterReferences: bool(process.env.ENABLE_CHARACTER_REFERENCES, false),
   enableNativeVideoAudio: bool(process.env.ENABLE_NATIVE_VIDEO_AUDIO, true),
   google: {
-    apiKey: process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || "",
+    get apiKey() {
+      return (
+        process.env.GOOGLE_AI_API_KEY ||
+        process.env.GEMINI_API_KEY ||
+        process.env.GOOGLE_API_KEY ||
+        ""
+      ).trim();
+    },
     textModel: process.env.GOOGLE_TEXT_MODEL || "gemini-3.6-flash",
     videoModel: process.env.GOOGLE_VIDEO_MODEL || "veo-3.1-fast-generate-preview",
     ttsModel: process.env.GOOGLE_TTS_MODEL || "gemini-3.1-flash-tts-preview",

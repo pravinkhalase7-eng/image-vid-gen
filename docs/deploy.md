@@ -7,7 +7,7 @@ Jenkins runs **on the same Docker host** as the app. There is no SSH `docker sav
 ## What Jenkins does
 
 1. Checkout repo
-2. Load secrets from Jenkins credential `storymotion-env-file` (optional; default uses `storymotion.env.example`)
+2. Load secrets from Jenkins credential `storymotion-env-file` (required — this is how `GOOGLE_AI_API_KEY` reaches the container)
 3. Build `storymotion-ai` image
 4. Run smoke test (`scripts/jenkins_smoke.js`)
 5. `docker compose up -d --no-build --force-recreate` on the VPS agent
@@ -17,13 +17,12 @@ Jenkins runs **on the same Docker host** as the app. There is no SSH `docker sav
 
 1. Install Docker + Docker Compose on the Jenkins agent (or use Jenkins-in-Docker with Docker socket mount — same as auto-reader).
 2. Create a Pipeline job pointing at this repo’s `Jenkinsfile`.
-3. Create credential (optional until you turn on `USE_ENV_CREDENTIAL`):
+3. Create credential:
    - **Kind:** Secret file
-   - **ID:** `storymotion-env-file` (exact)
+   - **ID:** `storymotion-env-file` (this ID field — **not** the uploaded filename `storymotion-env-file.env`)
+   - **Scope:** Global
    - **Contents:** filled copy of [`storymotion.env.example`](../storymotion.env.example)
-4. Set in that file:
-   - `GOOGLE_AI_API_KEY`
-   - `NEXT_PUBLIC_APP_URL=http://187.127.138.86:4000`
+4. Inside that file, `GOOGLE_AI_API_KEY=` must be your Gemini key (not empty). Then **rebuild** the Jenkins job so the container gets a new `.env`.
 5. Run the job. Optional parameters:
    - `SKIP_DEPLOY` — build + smoke only
    - `FORCE_RECREATE` — recreate containers

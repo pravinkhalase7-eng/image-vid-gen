@@ -32,17 +32,7 @@ pipeline {
     string(
       name: 'ENV_CREDENTIAL_ID',
       defaultValue: 'storymotion-env-file',
-      description: 'Jenkins Secret file credential ID (only used when USE_ENV_CREDENTIAL=true)'
-    )
-    booleanParam(
-      name: 'USE_ENV_CREDENTIAL',
-      defaultValue: false,
-      description: 'OFF by default. Turn ON only after you create the Jenkins Secret file credential.'
-    )
-    booleanParam(
-      name: 'USE_REPO_ENV_EXAMPLE',
-      defaultValue: true,
-      description: 'Use storymotion.env.example from the repo when no credential is loaded'
+      description: 'Jenkins Secret file credential ID. Must match Manage Jenkins → Credentials → ID (not the uploaded filename).'
     )
   }
 
@@ -88,39 +78,45 @@ pipeline {
       steps {
         script {
           def usedEnv = false
-          def credId = (params.ENV_CREDENTIAL_ID ?: 'storymotion-env-file').trim()
-
-          if (params.USE_ENV_CREDENTIAL) {
-            withCredentials([file(credentialsId: credId, variable: 'ENV_FILE')]) {
-              sh '''
-                echo "Secret file path bound: $ENV_FILE"
-                test -f "$ENV_FILE" || { echo "ERROR: credential file path missing"; exit 1; }
-                cp -f "$ENV_FILE" .env.deploy
-                echo "Copied credential file → .env.deploy"
-              '''
-              usedEnv = true
-              echo "Loaded Jenkins credential ID: ${credId}"
+          def credIds = []
+          def paramId = (params.ENV_CREDENTIAL_ID ?: 'storymotion-env-file').trim()
+          credIds.add(paramId)
+          ['storymotion-env-file', 'storymotion-env-file.env'].each { id ->
+            if (!credIds.contains(id)) {
+              credIds.add(id)
             }
-          } else {
-            echo "USE_ENV_CREDENTIAL=false — skipping Jenkins secret lookup (this is OK)."
+          }
+
+          for (id in credIds) {
+            if (usedEnv) {
+              break
+            }
+            try {
+              withCredentials([file(credentialsId: id, variable: 'ENV_FILE')]) {
+                sh '''
+                  echo "Secret file path bound: $ENV_FILE"
+                  test -f "$ENV_FILE" || { echo "ERROR: credential file path missing"; exit 1; }
+                  cp -f "$ENV_FILE" .env.deploy
+                  echo "Copied Jenkins secret file → .env.deploy"
+                '''
+                usedEnv = true
+              }
+              echo "Loaded Jenkins credential ID: ${id}"
+            } catch (err) {
+              echo "Could not load credential ${id}: ${err}"
+            }
           }
 
           if (!usedEnv) {
             sh '''
-              echo "=== Looking for env files ==="
-              ls -la storymotion.env.example storymotion.env .env \
-                /var/jenkins_home/storymotion.env /var/jenkins_home/secrets/storymotion.env 2>/dev/null || true
+              echo "=== Looking for fallback env files (not leftover workspace .env) ==="
+              ls -la /var/jenkins_home/secrets/storymotion.env /var/jenkins_home/storymotion.env storymotion.env 2>/dev/null || true
             '''
-            def candidates = []
-            if (params.USE_REPO_ENV_EXAMPLE) {
-              candidates.add('storymotion.env.example')
-            }
-            candidates.addAll([
-              'storymotion.env',
-              '.env',
+            def candidates = [
               '/var/jenkins_home/secrets/storymotion.env',
               '/var/jenkins_home/storymotion.env',
-            ])
+              'storymotion.env',
+            ]
             for (p in candidates) {
               if (fileExists(p)) {
                 sh "cp -f '${p}' .env.deploy"
@@ -132,23 +128,14 @@ pipeline {
           }
 
           if (!usedEnv) {
-            sh '''
-              cat > .env.deploy <<'EOF'
-APP_HOST_PORT=4000
-GOOGLE_AI_API_KEY=
-GEMINI_API_KEY=
-GOOGLE_TEXT_MODEL=gemini-3.6-flash
-ENABLE_VIDEO_GENERATION=false
-MOCK_VIDEO_GENERATION=false
-JOB_RUNNER=inline
-DATABASE_URL=file:/data/prod.db
-STORAGE_PATH=/app/storage
-NEXT_PUBLIC_APP_NAME="StoryMotion AI"
-NEXT_PUBLIC_APP_URL=http://187.127.138.86:4000
-EOF
-            '''
-            usedEnv = true
-            echo "Wrote built-in default .env.deploy with VPS IP 187.127.138.86"
+            error('''No env source found.
+Create Jenkins credential:
+  Kind: Secret file
+  ID: storymotion-env-file
+  Scope: Global
+  File contents: copy of storymotion.env.example with GOOGLE_AI_API_KEY filled in
+The credential ID is the ID field in Jenkins — not the uploaded filename (storymotion-env-file.env).
+Then rebuild.''')
           }
 
           if (params.PUBLIC_APP_URL?.trim()) {
@@ -164,32 +151,37 @@ EOF
           }
 
           sh '''
-            echo "=== .env.deploy key check (values hidden) ==="
-            missing=0
-            for key in NEXT_PUBLIC_APP_URL; do
-              val=$(grep -E "^${key}=" .env.deploy | head -n1 | cut -d= -f2- || true)
-              if [ -n "$val" ]; then
-                echo "$key=SET"
-              else
-                echo "$key=MISSING"
-                missing=1
+            set -e
+            # Accept common aliases people put in Google Cloud / Jenkins files
+            if ! grep -qE '^GOOGLE_AI_API_KEY=.+' .env.deploy; then
+              alias_val=$(grep -E '^(GEMINI_API_KEY|GOOGLE_API_KEY)=' .env.deploy | head -n1 | cut -d= -f2- || true)
+              alias_val=$(printf '%s' "$alias_val" | tr -d '"' | tr -d "'" | tr -d '\\r' | tr -d ' ')
+              if [ -n "$alias_val" ]; then
+                if grep -q '^GOOGLE_AI_API_KEY=' .env.deploy; then
+                  sed -i.bak "s|^GOOGLE_AI_API_KEY=.*|GOOGLE_AI_API_KEY=${alias_val}|" .env.deploy
+                else
+                  echo "GOOGLE_AI_API_KEY=${alias_val}" >> .env.deploy
+                fi
+                echo "Copied GEMINI_API_KEY/GOOGLE_API_KEY → GOOGLE_AI_API_KEY"
               fi
-            done
-            app_url=$(grep -E "^NEXT_PUBLIC_APP_URL=" .env.deploy | head -n1 | cut -d= -f2- || true)
-            echo "NEXT_PUBLIC_APP_URL value: ${app_url}"
-            case "$app_url" in
-              *YOUR_VPS_IP*|*your_vps_ip*|*YOUR_DOMAIN*|*your_domain*)
-                echo "ERROR: NEXT_PUBLIC_APP_URL still contains a placeholder hostname."
-                echo "Set PUBLIC_APP_URL=http://187.127.138.86:4000 and rebuild."
-                exit 1
-                ;;
-            esac
-            if [ "$missing" = "1" ] && [ "${SKIP_DEPLOY}" != "true" ]; then
-              echo "ERROR: env file is missing required keys (NEXT_PUBLIC_APP_URL)."
+            fi
+
+            echo "=== .env.deploy key check (values hidden) ==="
+            google=$(grep -E '^GOOGLE_AI_API_KEY=' .env.deploy | head -n1 | cut -d= -f2- || true)
+            google=$(printf '%s' "$google" | tr -d '"' | tr -d "'" | tr -d '\\r' | tr -d ' ')
+            if [ -n "$google" ]; then
+              echo "GOOGLE_AI_API_KEY=SET"
+            else
+              echo "GOOGLE_AI_API_KEY=MISSING"
+              echo "ERROR: the Jenkins secret file was loaded but GOOGLE_AI_API_KEY is empty."
+              echo "Edit the secret file so it contains: GOOGLE_AI_API_KEY=your_gemini_key"
+              echo "Credential ID must be storymotion-env-file (or set ENV_CREDENTIAL_ID to match)."
               exit 1
             fi
+            app_url=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env.deploy | head -n1 | cut -d= -f2- || true)
+            echo "NEXT_PUBLIC_APP_URL value: ${app_url}"
           '''
-            echo "Prepared .env.deploy for ${params.DEPLOY_ENV}"
+          echo "Prepared .env.deploy for ${params.DEPLOY_ENV}"
         }
       }
     }
@@ -261,6 +253,10 @@ EOF
           load_env ./.env
 
           echo "Runtime check: NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL} GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:+SET}"
+          if [ -z "${GOOGLE_AI_API_KEY}" ] && [ -z "${GEMINI_API_KEY}" ]; then
+            echo "ERROR: GOOGLE_AI_API_KEY is empty after loading .env — refusing to deploy"
+            exit 1
+          fi
 
           echo "Freeing previous StoryMotion containers (if any)..."
           docker compose -f docker-compose.yml down --remove-orphans || true
@@ -323,6 +319,8 @@ EOF
             echo "WARN: could not fetch HTML from inside container (image may still be starting)"
             docker logs storymotion-app --tail=40 || true
           fi
+          echo "=== Google key present inside container (value hidden) ==="
+          docker exec storymotion-app sh -c 'if [ -n "$GOOGLE_AI_API_KEY" ] || [ -n "$GEMINI_API_KEY" ]; then echo google_key=SET; else echo google_key=MISSING; exit 1; fi'
         '''
       }
     }
