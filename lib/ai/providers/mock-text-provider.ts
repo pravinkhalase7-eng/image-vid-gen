@@ -105,20 +105,31 @@ function extractCharacters(title: string, script: string): CharacterBible[] {
     names.push(title.split(" ").find((w) => /^[A-Z]/.test(w)) || "Momo");
   }
   const speciesGuess = guessSpecies(script + " " + title);
+  const human = speciesGuess.startsWith("human");
   return names.map((name, i) => ({
     id: slugify(name),
     name,
-    species: i === 0 ? speciesGuess : "animal friend",
-    age: "young",
-    appearance: `Stylized 3D animated ${speciesGuess} with large expressive eyes, soft rounded features, and a friendly silhouette.`,
-    clothing: i === 0 ? "a small yellow scarf" : "a tiny blue vest",
+    species: i === 0 ? speciesGuess : human ? "human" : "animal friend",
+    age: human ? (speciesGuess.includes("baby") ? "baby" : "young") : "young",
+    appearance: human
+      ? `Stylized 3D animated ${speciesGuess}, matching the script, expressive face, not an animal, not photoreal.`
+      : `Stylized 3D animated ${speciesGuess} with large expressive eyes, soft rounded features, and a friendly silhouette.`,
+    clothing: i === 0 ? (human ? "simple story-appropriate clothes from the script" : "a small yellow scarf") : "a tiny blue vest",
     personality: "curious, gentle, brave-in-the-end",
-    visual_features: ["large eyes", "soft rounded shapes", i === 0 ? "yellow scarf" : "blue vest"],
+    visual_features: human
+      ? ["human", speciesGuess, "stylized animation"]
+      : ["large eyes", "soft rounded shapes", i === 0 ? "yellow scarf" : "blue vest"],
   }));
 }
 
 function guessSpecies(text: string) {
   const t = text.toLowerCase();
+  if (/\bbaby boy\b|\blittle boy\b|\binfant boy\b/.test(t)) return "human baby boy";
+  if (/\bbaby girl\b|\blittle girl\b|\binfant girl\b/.test(t)) return "human baby girl";
+  if (/\bbaby\b|\binfant\b|\btoddler\b/.test(t)) return "human baby";
+  if (/\b(boy|girl|child|kid|human|man|woman|mother|father)\b/.test(t) && !/\b(elephant|rabbit|fox|bear|bird)\b/.test(t)) {
+    return "human";
+  }
   if (t.includes("elephant")) return "baby elephant";
   if (t.includes("rabbit")) return "rabbit";
   if (t.includes("fox")) return "fox";

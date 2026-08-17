@@ -8,6 +8,7 @@ import { MockTTSProvider } from "./mock-tts-provider";
 import { GeminiTextProvider } from "./gemini-text-provider";
 import { GeminiVideoProvider } from "./gemini-video-provider";
 import { GoogleTTSProvider } from "./google-tts-provider";
+import { ElevenLabsTTSProvider } from "./elevenlabs-tts-provider";
 
 export function getTextProvider(): TextProvider {
   if (appConfig.mock) return new MockTextProvider();
@@ -21,6 +22,7 @@ export function getVideoProvider(): VideoGenerationProvider {
 
 export function getTTSProvider(): TTSProvider {
   if (appConfig.mock) return new MockTTSProvider();
+  if (appConfig.elevenlabs.apiKey) return new ElevenLabsTTSProvider();
   return new GoogleTTSProvider();
 }
 

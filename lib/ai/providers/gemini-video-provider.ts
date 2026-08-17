@@ -7,6 +7,7 @@ import { logError, logJob } from "@/lib/logging";
 import { providerErrorMessage } from "@/lib/errors";
 import type { VideoGenerateRequest, VideoGenerateResult } from "@/lib/ai/types";
 import type { VideoGenerationProvider } from "./video-generation-provider";
+import { misplacedGoogleKeyMessage } from "./api-keys";
 
 const GEMINI_API_MODELS = [
   "veo-3.1-fast-generate-preview",
@@ -25,9 +26,8 @@ export class GeminiVideoProvider implements VideoGenerationProvider {
   private client: GoogleGenAI;
 
   constructor(apiKey = appConfig.google.apiKey) {
-    if (!apiKey) {
-      throw new Error("GOOGLE_AI_API_KEY is not configured");
-    }
+    const misplaced = misplacedGoogleKeyMessage(apiKey);
+    if (misplaced) throw new Error(misplaced);
     this.client = new GoogleGenAI({ apiKey });
   }
 

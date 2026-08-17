@@ -114,7 +114,7 @@ Avoid: ${NEGATIVE_VISUALS}`;
       `World: ${clean(input.world.environment, 180)}. Lighting: ${clean(input.world.lighting, 140)}. Colors: ${input.world.color_palette.slice(0, 5).join(", ")}.`,
       `Scene (${input.duration}s): ${clean(input.scene.title, 80)}. ${visual}`,
       `Camera: ${clean(input.scene.camera, 120)}. Emotion: ${clean(input.scene.emotion, 80)}. Smooth motion, film-like framing.`,
-      "Keep clothing and character design identical. Stylized cartoon animals only.",
+      "Keep clothing and character design identical. Characters must match the script (humans stay human).",
     ].join("\n");
     const prompt = compact.length > 3200 ? compact.slice(0, 3190) : compact || full.slice(0, 3200);
     return sanitizeVeoText(prompt);

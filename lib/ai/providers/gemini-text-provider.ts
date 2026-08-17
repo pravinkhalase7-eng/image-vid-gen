@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { appConfig } from "@/lib/config";
 import { parseJson } from "@/lib/ai/json";
+import { misplacedGoogleKeyMessage } from "./api-keys";
 import type { TextProvider, TextGenerateJsonOptions } from "./text-provider";
 
 export class GeminiTextProvider implements TextProvider {
@@ -9,6 +10,8 @@ export class GeminiTextProvider implements TextProvider {
   private client: GoogleGenAI;
 
   constructor(apiKey = appConfig.google.apiKey) {
+    const misplaced = misplacedGoogleKeyMessage(apiKey);
+    if (misplaced) throw new Error(misplaced);
     if (!apiKey) {
       throw new Error("GOOGLE_AI_API_KEY is not configured");
     }

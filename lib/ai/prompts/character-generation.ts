@@ -6,8 +6,12 @@ export function characterBiblePrompt(analysis: StoryAnalysis) {
 
 Create a Character Bible for every character in this analysis.
 Appearance must stay frozen for the entire film (clothing, colors, size, species, accessories, age, face).
-Use stylized animal or fantasy designs, never photorealistic humans.
-Age must be one of: young, adult, elder. Never describe characters as a child or child-equivalent.
+
+CAST FROM THE SCRIPT:
+- A baby boy / little boy / girl / man / woman is a stylized animated human of that description. Do not convert them into an animal or Pixar creature.
+- Age may be: baby, toddler, young, adult, elder — use the word that matches the script.
+- species is "human" when the character is a person; otherwise the animal/creature named in the script.
+- Never photorealistic. Never a real photograph.
 
 STORY SUMMARY:
 ${analysis.summary}

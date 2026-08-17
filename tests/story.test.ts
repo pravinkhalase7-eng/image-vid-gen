@@ -42,6 +42,27 @@ Momo trumpets. "I'm not unsure anymore!"`;
     expect(plan.scenes).toHaveLength(3);
   });
 
+  it("keeps a baby boy as a human, not a cartoon animal", () => {
+    const mock = new MockTextProvider();
+    const plan = mock.analyze({
+      title: "Arjun's Morning",
+      topic: "A baby boy learning to crawl",
+      script: `Scene 1
+A baby boy named Arjun wakes up and smiles.
+
+Scene 2
+Arjun crawls toward his toy.
+
+Scene 3
+Arjun laughs with his mother.`,
+      targetSeconds: 0,
+      sceneCount: 3,
+    });
+    expect(plan.characters[0].species).toMatch(/human/);
+    expect(plan.characters[0].appearance.toLowerCase()).toContain("baby boy");
+    expect(plan.characters[0].species).not.toMatch(/animal/);
+  });
+
   it("rejects empty title", () => {
     expect(() => validateStoryInput({ title: " ", topic: "kindness", script: SCRIPT })).toThrow();
   });

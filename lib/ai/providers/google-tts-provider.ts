@@ -5,6 +5,7 @@ import { appConfig } from "@/lib/config";
 import { ttsPerformancePrompt } from "@/lib/ai/prompts";
 import { pcmToWav } from "@/lib/audio/wav";
 import { probeDuration } from "@/lib/video/ffmpeg";
+import { misplacedGoogleKeyMessage } from "./api-keys";
 import type { TTSProvider, TTSRequest, TTSResult } from "./tts-provider";
 
 const VOICE_MAP = {
@@ -19,7 +20,8 @@ export class GoogleTTSProvider implements TTSProvider {
   private client: GoogleGenAI;
 
   constructor(apiKey = appConfig.google.apiKey) {
-    if (!apiKey) throw new Error("GOOGLE_AI_API_KEY is not configured");
+    const misplaced = misplacedGoogleKeyMessage(apiKey);
+    if (misplaced) throw new Error(misplaced);
     this.client = new GoogleGenAI({ apiKey });
   }
 

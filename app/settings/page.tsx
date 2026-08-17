@@ -22,11 +22,16 @@ export default function SettingsPage() {
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Voice model</dt>
-            <dd className="text-right">{appConfig.google.ttsModel}</dd>
+            <dd className="text-right">
+              {appConfig.elevenlabs.apiKey
+                ? `ElevenLabs (${appConfig.elevenlabs.model})`
+                : appConfig.google.ttsModel}
+            </dd>
           </div>
         </dl>
         <p className="mt-6 text-xs text-muted">
-          Change these in <code>.env</code>. API keys never leave the server.
+          Change these in the server env file. Gemini needs <code>GOOGLE_AI_API_KEY</code>. Voice can use{" "}
+          <code>ELEVENLABS_API_KEY</code>. Keys never leave the server.
         </p>
       </Card>
     </div>

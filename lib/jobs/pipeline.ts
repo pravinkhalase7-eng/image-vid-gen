@@ -12,9 +12,9 @@ import { getTextProvider, getTTSProvider, getVideoProvider } from "@/lib/ai/prov
 import { MockTextProvider } from "@/lib/ai/providers/mock-text-provider";
 import {
   characterBiblePrompt,
-  DEFAULT_STYLE_BIBLE,
   scenePlanningPrompt,
   storyAnalysisPrompt,
+  styleBibleFor,
   worldBiblePrompt,
 } from "@/lib/ai/prompts";
 import { videoPromptBuilder } from "@/lib/ai/video/prompt-builder";
@@ -102,7 +102,7 @@ async function runAnalyze(jobId: string, projectId: string) {
   let story: StoryAnalysis;
   let characters: CharacterBible[];
   let world: WorldBible;
-  let styleBible = DEFAULT_STYLE_BIBLE;
+  let styleBible = styleBibleFor(project.style);
   let scenes: PlannedScene[];
 
   if (text instanceof MockTextProvider) {
@@ -136,7 +136,7 @@ async function runAnalyze(jobId: string, projectId: string) {
     await jobQueue.heartbeat(jobId, { stage: "world", progress: 55, message: "Building your magical world..." });
     world = normalizeWorld(
       await text.generateJson<unknown>({
-        prompt: worldBiblePrompt(story, project.topic),
+        prompt: worldBiblePrompt(story, project.topic, project.style),
         schemaName: "world",
       }),
     );
@@ -491,7 +491,7 @@ async function renderScene(
   });
 
   const promptInput = {
-    styleBible: project.styleBible || DEFAULT_STYLE_BIBLE,
+    styleBible: project.styleBible || styleBibleFor(project.style),
     characters,
     world,
     scene: toPlanned(scene),

@@ -32,6 +32,20 @@ export function userFacingError(error: unknown, fallback: string) {
     return "This story isn't suitable for our kids' video generator.";
   }
   const lower = message.toLowerCase();
+  if (lower.includes("looks like an elevenlabs key")) {
+    return "GOOGLE_AI_API_KEY looks like an ElevenLabs key. Put that value in ELEVENLABS_API_KEY and set GOOGLE_AI_API_KEY to your Gemini key.";
+  }
+  if (lower.includes("elevenlabs")) {
+    return message.toLowerCase().includes("quota")
+      ? "ElevenLabs quota is used up on this key. Check usage at elevenlabs.io."
+      : "ElevenLabs rejected this API key. Put it in ELEVENLABS_API_KEY (starts with sk_), not GOOGLE_AI_API_KEY, then rebuild.";
+  }
+  if (
+    lower.includes("api key") &&
+    (lower.includes("invalid") || lower.includes("not valid") || lower.includes("unauthorized") || lower.includes("permission denied"))
+  ) {
+    return "Google rejected this API key. If you pasted an ElevenLabs key, it belongs in ELEVENLABS_API_KEY. Gemini still needs GOOGLE_AI_API_KEY from Google AI Studio.";
+  }
   if (lower.includes("not found") || lower.includes("no longer available") || lower.includes("has been retired")) {
     return "Google video generation isn't available with this model yet.";
   }
@@ -72,6 +86,9 @@ export function isNonRetryableProviderError(error: unknown) {
     lower.includes("not found") ||
     lower.includes("has been retired") ||
     lower.includes("no longer available") ||
+    lower.includes("api key") ||
+    lower.includes("elevenlabs") ||
+    lower.includes("looks like an elevenlabs") ||
     (lower.includes("person") && lower.includes("not supported"))
   );
 }

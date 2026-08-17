@@ -74,22 +74,29 @@ describe("VideoPromptBuilder", () => {
     });
     expect(compact.length).toBeLessThan(3200);
     expect(compact).toContain("yellow scarf");
-    expect(compact).toContain("Stylized 3D");
+    expect(compact.toLowerCase()).toContain("stylized 3d");
   });
 
-  it("never mentions children in the Veo prompt or negative prompt", () => {
+  it("does not rewrite a baby boy into a cartoon animal", () => {
     const compact = videoPromptBuilder.buildForProvider({
       styleBible: DEFAULT_STYLE_BIBLE,
-      characters: [{ ...momo, age: "Young child equivalent" }],
+      characters: [{
+        ...momo,
+        name: "Arjun",
+        species: "human baby boy",
+        age: "baby",
+        appearance: "stylized 3D animated baby boy",
+        clothing: "a small blue shirt",
+        visual_features: ["baby boy", "human"],
+      }],
       world,
-      scene: scene("scene_01", { visual_prompt: "A child-like rabbit hops in a children's forest." }),
+      scene: scene("scene_01", { visual_prompt: "A baby boy smiles at his mother.", title: "Baby boy smiles" }),
       duration: 6,
     });
-    expect(compact.toLowerCase()).not.toMatch(/\bchild(?:ren)?\b/);
-    expect(compact.toLowerCase()).not.toMatch(/\bkid(?:s)?\b/);
-    expect(compact.toLowerCase()).not.toMatch(/\bminors?\b/);
-    expect(videoPromptBuilder.negativePrompt().toLowerCase()).not.toMatch(/\bchild/);
-    expect(videoPromptBuilder.negativePrompt().toLowerCase()).not.toMatch(/\bminor/);
+    expect(compact.toLowerCase()).toContain("baby boy");
+    expect(compact.toLowerCase()).not.toContain("woodland");
+    expect(compact.toLowerCase()).not.toContain("cartoon animals only");
+    expect(compact.toLowerCase()).not.toContain("young animal");
   });
 });
 
@@ -111,5 +118,30 @@ describe("Flow prompt pack", () => {
     expect(pack.scenes[0].prompt).toContain("LIP SYNC");
     expect(pack.scenes[0].prompt).toContain("DIALOGUE");
     expect(pack.all).toContain("Google Flow");
+    expect(pack.masterLock.toLowerCase()).not.toContain("cartoon animals only");
+    expect(pack.masterLock.toLowerCase()).not.toContain("woodland creatures");
+  });
+
+  it("keeps a baby boy as a human in the prompt pack", () => {
+    const pack = buildFlowPromptPack({
+      title: "Arjun",
+      styleBible: DEFAULT_STYLE_BIBLE,
+      characters: [{
+        id: "arjun",
+        name: "Arjun",
+        species: "human baby boy",
+        age: "baby",
+        appearance: "stylized 3D animated baby boy",
+        clothing: "a small blue shirt",
+        personality: "curious",
+        visual_features: ["baby boy"],
+      }],
+      world,
+      scenes: [scene("scene_01", { visual_prompt: "A baby boy crawls toward a toy.", script_segment: "The baby boy crawls." })],
+    });
+    expect(pack.masterLock.toLowerCase()).toContain("baby boy");
+    expect(pack.masterLock.toLowerCase()).toContain("humans stay human");
+    expect(pack.scenes[0].prompt.toLowerCase()).toContain("baby boy");
+    expect(pack.masterLock.toLowerCase()).not.toContain("young animal");
   });
 });

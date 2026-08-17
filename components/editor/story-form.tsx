@@ -79,7 +79,7 @@ export function StoryForm() {
     <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
       <Card>
         <h2 className="font-display text-3xl">Create a Video</h2>
-        <p className="mt-2 text-sm text-muted">Paste a story. Label Scene 1, Scene 2, Scene 3 — we keep exactly that many screens, not extra shots.</p>
+        <p className="mt-2 text-sm text-muted">Paste a story. Label Scene 1, Scene 2, Scene 3 — we keep exactly that many screens. A baby boy stays a baby boy (stylized animation, not an animal cartoon).</p>
 
         <div className="mt-8 space-y-5">
           <div>

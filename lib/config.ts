@@ -25,6 +25,24 @@ export const appConfig = {
     ttsModel: process.env.GOOGLE_TTS_MODEL || "gemini-3.1-flash-tts-preview",
     imageModel: process.env.GOOGLE_IMAGE_MODEL || "imagen-4.0-generate-001",
   },
+  elevenlabs: {
+    get apiKey() {
+      return (process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_API_KEY || "").trim();
+    },
+    model: process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2",
+    voiceId: (process.env.ELEVENLABS_VOICE_ID || "").trim(),
+    voices: {
+      get child_friendly() {
+        return (process.env.ELEVENLABS_VOICE_CHILD || process.env.ELEVENLABS_VOICE_ID || "").trim();
+      },
+      get female() {
+        return (process.env.ELEVENLABS_VOICE_FEMALE || process.env.ELEVENLABS_VOICE_ID || "").trim();
+      },
+      get male() {
+        return (process.env.ELEVENLABS_VOICE_MALE || process.env.ELEVENLABS_VOICE_ID || "").trim();
+      },
+    },
+  },
   storage: {
     driver: (process.env.STORAGE_DRIVER || "local") as "local" | "gcs" | "s3",
     path: process.env.STORAGE_PATH || "./storage",

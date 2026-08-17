@@ -1,7 +1,7 @@
 import { DEFAULT_STYLE_BIBLE } from "@/lib/ai/prompts";
 import type { CharacterBible, PlannedScene, WorldBible } from "@/lib/ai/types";
 import { extractSpokenLine } from "./dialogue";
-import { sanitizeVeoText, VEO_NEGATIVE, VEO_STYLE } from "./sanitize-veo";
+import { sanitizeVeoText, VEO_NEGATIVE } from "./sanitize-veo";
 
 export type FlowPromptPack = {
   title: string;
@@ -35,10 +35,10 @@ export function buildMasterLock(input: {
   const palette = (input.world.color_palette ?? []).slice(0, 6).join(", ");
   return sanitizeVeoText(`CONSISTENCY LOCK — paste this block unchanged into every scene in Gemini or Google Flow.
 
-STYLE: ${VEO_STYLE} ${style}
+STYLE: ${style}
 
 CHARACTERS (must look identical in every shot, same face, size, colors, and clothing):
-${characters || "- Keep the same stylized animal cast in every shot."}
+${characters || "- Keep the same cast in every shot, matching the script."}
 
 WORLD: ${sanitizeVeoText(input.world.environment)}
 ${sanitizeVeoText(input.world.bible)}
@@ -48,7 +48,7 @@ Lighting: ${sanitizeVeoText(input.world.lighting)}
 Time of day: ${sanitizeVeoText(input.world.time_of_day)}
 Colors: ${palette}
 
-RULES: Stylized cartoon animals only. No photorealistic humans. No on-screen text, captions, logos, or watermarks. Smooth cinematic camera. Do not change character design between scenes.`);
+RULES: Match the script's cast. Humans stay human (a baby boy stays a stylized animated baby boy). Animals appear only if the script has animals. Stylized animation, not photoreal. No on-screen text, captions, logos, or watermarks. Smooth cinematic camera. Do not change character design between scenes.`);
 }
 
 export function buildSceneFlowPrompt(input: {

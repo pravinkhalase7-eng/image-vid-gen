@@ -1,4 +1,4 @@
-export { DIRECTOR_PREAMBLE, DEFAULT_STYLE_BIBLE, NEGATIVE_VISUALS } from "./director";
+export { DIRECTOR_PREAMBLE, DEFAULT_STYLE_BIBLE, NEGATIVE_VISUALS, styleBibleFor, STYLE_BIBLES } from "./director";
 export { safetyPrompt } from "./safety";
 export { storyAnalysisPrompt } from "./story-analysis";
 export { characterBiblePrompt } from "./character-generation";

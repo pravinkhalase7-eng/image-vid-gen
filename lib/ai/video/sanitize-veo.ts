@@ -1,19 +1,11 @@
 import { providerErrorMessage } from "@/lib/errors";
 
+/** Soften Veo-blocked photorealism. Do not rewrite humans into animals. */
 const CHILD_LANGUAGE: [RegExp, string][] = [
-  [/\bphotorealistic children\b/gi, "photorealistic humans"],
-  [/\breal minors\b/gi, "photorealistic humans"],
-  [/\byounger child equivalent\b/gi, "young"],
-  [/\byoung child equivalent\b/gi, "young"],
-  [/\bchild equivalent\b/gi, "young"],
-  [/\bchildren's\b/gi, "animated"],
-  [/\bchild's\b/gi, "the character's"],
-  [/\bchildren\b/gi, "audiences"],
-  [/\bchild\b/gi, "young animal"],
-  [/\bkids'\b/gi, ""],
-  [/\bkids\b/gi, ""],
-  [/\bkid\b/gi, ""],
-  [/\bminors\b/gi, ""],
+  [/\bphotorealistic children\b/gi, "stylized animated children"],
+  [/\bphotorealistic (?:child|kid|baby|infant|toddler)s?\b/gi, "stylized animated child"],
+  [/\breal photographs of minors\b/gi, "stylized animated children"],
+  [/\breal minors\b/gi, "stylized animated children"],
 ];
 
 const DISTRESS: [RegExp, string][] = [
@@ -29,10 +21,10 @@ const DISTRESS: [RegExp, string][] = [
 ];
 
 export const VEO_STYLE =
-  "Stylized 3D animated animal cartoon, Pixar-like, warm cinematic lighting, appealing woodland creatures, no on-screen text, no watermarks, no photorealistic humans.";
+  "Family-friendly stylized 3D animation. Characters match the script: humans stay human, animals stay animals. Warm cinematic lighting. No photorealism, no on-screen text, no watermarks.";
 
 export const VEO_NEGATIVE =
-  "photorealistic humans, graphic violence, blood, horror, sexual content, hate symbols, on-screen text, subtitles, captions, watermark, logo, extra limbs, distorted anatomy, shaky camera, random jump cuts, cluttered frame, dark grim atmosphere";
+  "photorealistic children, real photographs of minors, graphic violence, blood, horror, sexual content, hate symbols, on-screen text, subtitles, captions, watermark, logo, extra limbs, distorted anatomy, shaky camera, random jump cuts, cluttered frame, dark grim atmosphere, replacing humans with cartoon animals";
 
 export function sanitizeVeoText(value: string, extra: [RegExp, string][] = []) {
   let out = value;

@@ -220,12 +220,26 @@ Or: Build with Parameters → ENV_CREDENTIAL_ID = the ID shown on that credentia
             google=$(printf '%s' "$google" | tr -d '"' | tr -d "'" | tr -d '\\r' | tr -d ' ')
             if [ -n "$google" ]; then
               echo "GOOGLE_AI_API_KEY=SET"
+              prefix=$(printf '%s' "$google" | cut -c1-3)
+              if [ "$prefix" = "sk_" ]; then
+                echo "ERROR: GOOGLE_AI_API_KEY looks like an ElevenLabs key (starts with sk_)."
+                echo "Put the ElevenLabs key in ELEVENLABS_API_KEY=sk_..."
+                echo "Put the Gemini key in GOOGLE_AI_API_KEY= (from Google AI Studio, usually starts with AIza)."
+                exit 1
+              fi
             else
               echo "GOOGLE_AI_API_KEY=MISSING"
               echo "ERROR: the Jenkins secret file was loaded but GOOGLE_AI_API_KEY is empty."
               echo "Edit the secret file so it contains: GOOGLE_AI_API_KEY=your_gemini_key"
               echo "Credential ID must be storymotion-env-file (or set ENV_CREDENTIAL_ID to match)."
               exit 1
+            fi
+            eleven=$(grep -E '^ELEVENLABS_API_KEY=|^ELEVEN_API_KEY=' .env.deploy | head -n1 | cut -d= -f2- || true)
+            eleven=$(printf '%s' "$eleven" | tr -d '"' | tr -d "'" | tr -d '\\r' | tr -d ' ')
+            if [ -n "$eleven" ]; then
+              echo "ELEVENLABS_API_KEY=SET"
+            else
+              echo "ELEVENLABS_API_KEY=MISSING (optional — Gemini TTS will be used for voice)"
             fi
             app_url=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env.deploy | head -n1 | cut -d= -f2- || true)
             echo "NEXT_PUBLIC_APP_URL value: ${app_url}"
